@@ -4,19 +4,19 @@
 
 为了方便riscv-rvv加速，将blislab项目中的double数据类型改为float（即测试单精度浮点性能），且例子都是列主序的。
 
-github库使用步骤见
-
 ## 1 blislab项目
 
-Blislab是一个开源教学项目，教你一步一步优化矩阵乘。
+Blislab是一个开源教学项目，教你一步一步优化矩阵乘。项目地址：https://github.com/flame/blislab
+
+在blislab项目的基础上，我进行了一些删减优化（删成最简的代码，只支持x86或riscv的linux OS），这样项目更清晰明了，方便入门。
 
 **项目地址：**
 
-~~~sh
-https://github.com/flame/blislab
+~~~shell
+https://github.com/surez-ok/blislab_riscv
 ~~~
 
-细节可参考：[tutorial](https://github.com/flame/blislab/blob/master/tutorial.pdf)
+上手请参照第3节[开始上手](#start)
 
 ## 2 优化步骤
 
@@ -334,7 +334,7 @@ MC * KC  小于L2的1/2
 
 ![step3测试结果](doc/step3.png)
 
-## 3 开始上手
+## 3 开始上手<span id = "start"></span>
 
 以step0为例（其它几个例子也是相同操作）：
 
