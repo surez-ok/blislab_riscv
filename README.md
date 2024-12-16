@@ -284,7 +284,7 @@ step2相较于step1的区别是：在k方向上也进行了分块。
 	for jc = 0; jc < n; step = NC
 		for ic = 0; ic < m; step = MC
             for pc = 0; pc < k; step = KC
-				pack_A(ic, pc)                   // 准备好pack_A矩阵
+                pack_A(ic, pc)                   // 准备好pack_A矩阵
                 pack_B(pc, jc)                   // 准备好pack_B矩阵
                 Kernel_op(A(ic, pc), (pc, jc))   // 计算pack_A * pack_B
              endfor
