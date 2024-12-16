@@ -47,7 +47,7 @@ void bl_sgemm_ref(
     if ( m == 0 || n == 0 || k == 0 ) return;
 
     // Reference GEMM implementation.
-    // ijp
+    // ijp 顺序
     for ( i = 0; i < m; i ++ ) {
         for ( j = 0; j < n; j ++ ) {
             for ( p = 0; p < k; p ++ ) {
