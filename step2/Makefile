@@ -6,13 +6,15 @@ CROSS_COMPILE ?=
 CC  = $(CROSS_COMPILE)gcc
 CXX = $(CROSS_COMPILE)g++
 
-COMPILER_OPT_LEVEL=O3
+COMPILER_OPT_LEVEL=-O3
+
+GEMMMODE ?= -DCOLUMN_MAJOR
 
 ifeq ($(CROSS_COMPILE),)
-CFLAGS = -$(COMPILER_OPT_LEVEL) -march=core-avx2 -fPIC -static
+CFLAGS = $(COMPILER_OPT_LEVEL) $(GEMMMODE) -march=core-avx2 -fPIC -static
 LDLIBS = -lpthread -lm
 else
-CFLAGS = -$(COMPILER_OPT_LEVEL) -march=rv64imafdcv -mabi=lp64d -static
+CFLAGS = $(COMPILER_OPT_LEVEL) $(GEMMMODE) -march=rv64imafdcv -mabi=lp64d -static
 LDLIBS = -lm
 endif
 
@@ -22,8 +24,7 @@ CFLAGS += -I$(COMMONDIR)
 ASM_SRC= 
 CC_SRC= my_sgemm.c \
         $(COMMONDIR)/test_bl_sgemm.c \
-        $(COMMONDIR)/bl_sgemm_ref.c \
-        $(COMMONDIR)/bl_sgemm_util.c
+        $(COMMONDIR)/bl_sgemm_ref.c
 
 CPP_SRC=
 
@@ -62,5 +63,3 @@ $(BLISLAB_TEST_EXE): $(ALL_OBJS)
 
 clean:
 	@rm -rf $(ALL_OBJS) $(SHAREDLIBBLISLAB) $(BLISLAB_TEST_EXE) $(ALL_DEPS)
-
-

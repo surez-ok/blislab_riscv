@@ -43,12 +43,11 @@
  * 
  * */
 
-#include <stdio.h>
-
 #include "bl_sgemm.h"
 #include "bl_config.h"
 
-inline void packA_mcxkc(
+#ifdef ROW_MAJOR
+void packA_mcxkc(
         int    m,
         int    k,
         float *XA,
@@ -56,20 +55,16 @@ inline void packA_mcxkc(
         float *packA
         )
 {
-    int    i, p;
+    int i, p;
 
-    for ( p = 0; p < k; p ++ ) {
-        for ( i = 0; i < m; i ++ ) {
-            *packA ++ = *(XA + p * ldXA + i);
-        }
+    for (i = 0; i < m; i ++) {
+      for (p = 0; p < k; p ++) {
+        *packA++ = *(XA + i * ldXA + p);
+      }
     }
 }
 
-/*
- * --------------------------------------------------------------------------
- */
-
-inline void packB_kcxnc(
+void packB_kcxnc(
         int    n,
         int    k,
         float *XB,
@@ -77,18 +72,15 @@ inline void packB_kcxnc(
         float *packB
         )
 {
-    int    j, p;
+    int j, p;
 
-    for ( j = 0; j < n; j ++ ) {
-        for ( p = 0; p < k; p ++ ) {
-            *packB ++ = *(XB + j * ldXB + p);
-        }
+    for (p = 0; p < k; p ++) {
+      for (j = 0; j < n; j ++) {
+          *packB++ = *(XB + p * ldXB + j);
+      }
     }
 }
 
-/*
- * --------------------------------------------------------------------------
- */
 void bl_macro_kernel(
         int    m,
         int    n,
@@ -99,23 +91,17 @@ void bl_macro_kernel(
         int    ldc
         )
 {
-    int    i, p, j;
+    int i, p, j;
 
-
-    for ( j = 0; j < n; j ++ ) {            // Start 2-nd loop
-      for ( p = 0; p < k; p ++ ) {          // Start 1-st loop
-          float elem_B = packB[ j * k + p ];
-          float *p_elemA = &(packA[ p * m]);
-          float *p_elemC = &(C[ j * ldc]);
-          for ( i = 0; i < m; i ++ ) {      // Start 0-th loop
-              *p_elemC++ += *p_elemA++ * elem_B;
-          }                                 // End   0-th loop
-      }                                     // End   1-st loop
-  }
-                                           // 2-th loop around micro-kernel
+    for (i = 0; i < m; i++) {
+        for (p = 0; p < k; p++) {
+            for (j = 0; j < n; j++) {
+                C[i * ldc + j] += packA[i * k + p] * packB[p * n + j];
+            }
+        }  
+    }                           
 }
 
-// C must be aligned
 void bl_sgemm(
         int    m,
         int    n,
@@ -124,47 +110,169 @@ void bl_sgemm(
         int    lda,
         float *XB,
         int    ldb,
-        float *C,        // must be aligned
-        int    ldc        // ldc must also be aligned
+        float *C,
+        int    ldc
         )
 {
-    int    i, j, p;
-    int    ic, ib, jc, jb, pc, pb;
-    int    ir, jr;
+    int i, j, p;
+    int ic, ib, jc, jb, pc, pb;
+    int ir, jr;
     float *packA, *packB;
-    char   *str;
+    char *str;
 
     // Early return if possible
-    if ( m == 0 || n == 0 || k == 0 ) {
-        printf( "bl_sgemm(): early return\n" );
+    if (m == 0 || n == 0 || k == 0) {
+        printf("bl_sgemm(): early return\n");
         return;
     }
 
     // Allocate packing buffers
-    packA  = bl_malloc_aligned( DGEMM_KC, ( DGEMM_MC + 1 ), sizeof(float) );
-    packB  = bl_malloc_aligned( DGEMM_KC, ( DGEMM_NC + 1 ), sizeof(float) );
+    packA = malloc(DGEMM_KC * DGEMM_MC * sizeof(float));
+    packB = malloc(DGEMM_KC * DGEMM_NC * sizeof(float));
 
-    for ( jc = 0; jc < n; jc += DGEMM_NC ) {                                 // 5-th loop around micro-kernel
-        jb = min( n - jc, DGEMM_NC );
-        for ( pc = 0; pc < k; pc += pb ) {                                   // 4-th loop around micro-kernel
-            pb = min( k - pc, DGEMM_KC );
+    for (ic = 0; ic < m; ic += ib) {                               // 3-rd loop around micro-kernel
+        ib = min(m - ic, DGEMM_MC);
+        for (pc = 0; pc < k; pc += pb) {                           // 4-th loop around micro-kernel
+            pb = min(k - pc, DGEMM_KC);
 
-            packB_kcxnc(
+            packA_mcxkc(
+                        ib,
+                        pb,
+                        &XA[ic * lda + pc],
+                        lda,
+                        packA
+                        );
+
+            for (jc = 0; jc < n; jc += jb) {                // 5-th loop around micro-kernel
+                jb = min(n - jc, DGEMM_NC);
+                packB_kcxnc(
                     jb,
                     pb,
-                    &XB[ jc * ldb +  pc],
+                    &XB[pc * ldb +  jc],
                     ldb,
                     packB
                     );
 
-            for ( ic = 0; ic < m; ic += ib ) {                               // 3-rd loop around micro-kernel
+                bl_macro_kernel(
+                        ib,
+                        jb,
+                        pb,
+                        packA,
+                        packB,
+                        &C[ic * ldc + jc], 
+                        ldc
+                    );
+            }                                                      // End 3.rd loop around micro-kernel
+        }                                                          // End 4.th loop around micro-kernel
+    }                                                              // End 5.th loop around micro-kernel
+    free( packA );
+    free( packB );
+}
 
-                ib = min( m - ic, DGEMM_MC );
+#else /* COLUMN_MAJOR */
 
+inline void packA_mcxkc(
+        int    m,
+        int    k,
+        float *XA,
+        int    ldXA,
+        float *packA
+        )
+{
+    int i, p;
+
+    for (p = 0; p < k; p ++) {
+        for (i = 0; i < m; i ++) {
+            *packA++ = *(XA + p * ldXA + i);
+        }
+    }
+}
+
+inline void packB_kcxnc(
+        int    n,
+        int    k,
+        float *XB,
+        int    ldXB,
+        float *packB
+        )
+{
+    int j, p;
+
+    for (j = 0; j < n; j ++) {
+        for (p = 0; p < k; p ++) {
+            *packB ++ = *(XB + j * ldXB + p);
+        }
+    }
+}
+
+void bl_macro_kernel(
+        int    m,
+        int    n,
+        int    k,
+        float *packA,
+        float *packB,
+        float *C,
+        int    ldc
+        )
+{
+    int i, p, j;
+
+    for (j = 0; j < n; j++) {            // Start 2-nd loop
+      for (p = 0; p < k; p++) {          // Start 1-st loop
+        for (i = 0; i < m; i ++) {
+           C[ j * ldc + i] += packA[p * m + i] * packB[j * k + p];
+        }
+      }                                  // End   1-st loop
+  }                                      // 2-th loop around micro-kernel                                 
+}
+
+void bl_sgemm(
+        int    m,
+        int    n,
+        int    k,
+        float *XA,
+        int    lda,
+        float *XB,
+        int    ldb,
+        float *C,
+        int    ldc
+        )
+{
+    int i, j, p;
+    int ic, ib, jc, jb, pc, pb;
+    int ir, jr;
+    float *packA, *packB;
+    char *str;
+
+    // Early return if possible
+    if (m == 0 || n == 0 || k == 0) {
+        printf("bl_sgemm(): early return\n");
+        return;
+    }
+
+    // Allocate packing buffers
+    packA = malloc(DGEMM_KC * DGEMM_MC * sizeof(float));
+    packB = malloc(DGEMM_KC * DGEMM_NC * sizeof(float));
+
+    for (jc = 0; jc < n; jc += jb) {                                // 5-th loop around micro-kernel
+        jb = min(n - jc, DGEMM_NC);
+        for (pc = 0; pc < k; pc += pb) {                          // 4-th loop around micro-kernel
+            pb = min(k - pc, DGEMM_KC);
+
+            packB_kcxnc(
+                    jb,
+                    pb,
+                    &XB[jc * ldb +  pc],
+                    ldb,
+                    packB
+                    );
+
+            for ( ic = 0; ic < m; ic += ib ) {                     // 3-rd loop around micro-kernel
+                ib = min(m - ic, DGEMM_MC);
                 packA_mcxkc(
                         ib,
                         pb,
-                        &XA[ pc * lda + ic],
+                        &XA[pc * lda + ic],
                         lda,
                         packA
                         );
@@ -174,14 +282,15 @@ void bl_sgemm(
                         pb,
                         packA,
                         packB,
-                        &C[ jc * ldc + ic ], 
+                        &C[jc * ldc + ic], 
                         ldc
                         );
-            }                                                                     // End 3.rd loop around micro-kernel
-        }                                                                         // End 4.th loop around micro-kernel
-    }                                                                             // End 5.th loop around micro-kernel
+            }                                                      // End 3.rd loop around micro-kernel
+        }                                                          // End 4.th loop around micro-kernel
+    }                                                              // End 5.th loop around micro-kernel
 
     free( packA );
     free( packB );
 }
+#endif
 

@@ -42,32 +42,25 @@
  *
  * 
  * */
- 
 
 #include "bl_sgemm.h"
 #include "bl_config.h"
 
-void AddDot( int k, float *A, int lda, float *B, int ldb, float *result ) {
-  int p;
-  for ( p = 0; p < k; p++ ) {
-    *result += A( 0, p ) * B( p, 0 );
-  }
-}
-
-void AddDot_MRxNR( int k, float *A, int lda, float *B, int ldb, float *C, int ldc )
+void AddDot_MRxNR(int k, float *A, int lda, float *B, int ldb, float *C, int ldc)
 {
   int ir, jr;
   int p;
+
   for ( jr = 0; jr < DGEMM_NR; jr++ ) {
     for ( ir = 0; ir < DGEMM_MR; ir++ ) {
-
-      AddDot( k, &A( ir, 0 ), lda, &B( 0, jr ), ldb, &C( ir, jr ) );
-
+      for ( p = 0; p < k; p++ ) {
+        C( ir, jr ) += A(ir, p) * B(p, jr);
+      }
     }
   }
 }
 
-void AddDot_2x2_opt( int k, float *A, int lda, float *B, int ldb, float *C, int ldc )
+void AddDot_2x2_opt(int k, float *A, int lda, float *B, int ldb, float *C, int ldc)
 {
    register float C00, C01, C10, C11;
    int p;
@@ -76,6 +69,7 @@ void AddDot_2x2_opt( int k, float *A, int lda, float *B, int ldb, float *C, int 
    C01 = 0.0f;
    C10 = 0.0f;
    C11 = 0.0f;
+
    for (p = 0; p < k; p++) {
      C00 += A(0, p) * B(p, 0);
      C01 += A(0, p) * B(p, 1);
@@ -96,28 +90,26 @@ void bl_sgemm(
     int    lda,
     float *B,
     int    ldb,
-    float *C,        // must be aligned
-    int    ldc        // ldc must also be aligned
+    float *C,
+    int    ldc
 )
 {
     int i, j, p;
     int ir, jr;
 
     // Early return if possible
-    if ( m == 0 || n == 0 || k == 0 ) {
+    if (m == 0 || n == 0 || k == 0) {
         printf( "bl_sgemm(): early return\n" );
         return;
     }
 
-    for ( j = 0; j < n; j += DGEMM_NR ) {          // Start 2-nd loop
-        for ( i = 0; i < m; i += DGEMM_MR ) {      // Start 1-st loop
+    for (j = 0; j < n; j += DGEMM_NR) {           // Start 2-nd loop
+        for (i = 0; i < m; i += DGEMM_MR) {       // Start 1-st loop
            #if !(DGEMM_MR == 2 && DGEMM_NR == 2)
-           AddDot_MRxNR( k, &A( i, 0 ), lda, &B( 0, j ), ldb, &C( i, j ), ldc );
+           AddDot_MRxNR(k, &A(i, 0), lda, &B(0, j), ldb, &C(i, j), ldc);
            #else
-           AddDot_2x2_opt( k, &A( i, 0 ), lda, &B( 0, j ), ldb, &C( i, j ), ldc );
+           AddDot_2x2_opt(k, &A(i, 0), lda, &B(0, j), ldb, &C(i, j), ldc);
            #endif
         }                                          // End   1-st loop
     }                                              // End   2-nd loop
 }
-
-

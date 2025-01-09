@@ -56,7 +56,6 @@ extern "C" {
 
 
 #include <math.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -71,43 +70,37 @@ extern "C" {
 // gettimeofday() needs this.
 #include <sys/time.h>
 #include <time.h>
-
-#define GEMM_SIMD_ALIGN_SIZE 32
+#include <assert.h>
 
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
 
-#define A( i, j )     A[ (j)*lda + (i) ]
-#define B( i, j )     B[ (j)*ldb + (i) ]
-#define C( i, j )     C[ (j)*ldc + (i) ]
-#define C_ref( i, j ) C_ref[ (j)*ldc_ref + (i) ]
+#ifdef ROW_MAJOR
+
+#define A(i, j)     A[(i)*lda + (j)]
+#define B(i, j)     B[(i)*ldb + (j)]
+#define C(i, j)     C[(i)*ldc + (j)]
+#define C_ref(i, j) C_ref[(i)*ldc_ref + (j)]
+
+#else /* COLUMN_MAJOR */
+
+#define A(i, j)     A[(j)*lda + (i)]
+#define B(i, j)     B[(j)*ldb + (i)]
+#define C(i, j)     C[(j)*ldc + (i)]
+#define C_ref(i, j) C_ref[(j)*ldc_ref + (i)]
+
+#endif
 
 void bl_sgemm(
-        int    m,
-        int    n,
-        int    k,
-        float *A,
-        int    lda,
-        float *B,
-        int    ldb,
-        float *C,
-        int    ldc
-        );
-
-float *bl_malloc_aligned(
-        int    m,
-        int    n,
-        int    size
-        );
-
-void bl_printmatrix(
-        float *A,
-        int    lda,
-        int    m,
-        int    n
-        );
-
-float bl_clock( void );
-float bl_clock_helper();
+    int    m,
+    int    n,
+    int    k,
+    float *A,
+    int    lda,
+    float *B,
+    int    ldb,
+    float *C,
+    int    ldc
+    );
 
 void bl_sgemm_ref(
     int    m,

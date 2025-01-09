@@ -8,7 +8,7 @@ echo "result=["
 echo -e "%m\t%n\t%k\t%MY_MFLOPS\t%REF_MFLOPS"
 for (( k=k_start; k<=k_end; k+=k_blocksize ))
 do
-    ./test_bl_sgemm_step2.x     $k $k $k 
+    ./test_bl_sgemm_step3.x     $k $k $k 
 done
 echo "];"
 

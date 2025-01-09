@@ -55,11 +55,11 @@ void bl_sgemm(
     int    lda,
     float *B,
     int    ldb,
-    float *C,        // must be aligned
-    int    ldc        // ldc must also be aligned
+    float *C,
+    int    ldc
 )
 {
-  int    i, j, p;
+  int i, j, p;
 
   // Early return if possible
   if ( m == 0 || n == 0 || k == 0 ) {
@@ -67,16 +67,31 @@ void bl_sgemm(
     return;
   }
 
-  for ( j = 0; j < n; j ++ ) {              // Start 2-nd loop
+#ifdef ROW_MAJOR
+  assert(lda == k);
+  assert(ldb == n);
+  assert(ldc == n);
+  // ipj mode
+  for ( i = 0; i < m; i ++ ) {              // Start 2-th loop
       for ( p = 0; p < k; p ++ ) {          // Start 1-st loop
-          for ( i = 0; i < m; i ++ ) {      // Start 0-th loop
-
-              //C[ j * ldc + i ] += A[ p * lda + i ] * B[ j * ldb + p ];
-              C( i, j ) += A( i, p ) * B( p, j ); //Each operand is a MACRO defined in bl_sgemm() function.
-
+          for ( j = 0; j < n; j ++ ) {      // Start 0-nd loop
+              C[ i * ldc + j ] += A[ i * lda + p ] * B[ p * ldb + j ];
           }                                 // End   0-th loop
       }                                     // End   1-st loop
   }                                         // End   2-nd loop
+#else /* COLUMN_MAJOR */
+  assert(lda == m);
+  assert(ldb == k);
+  assert(ldc == m);
+  // jpi mode
+  for ( j = 0; j < n; j ++ ) {              // Start 2-nd loop
+      for ( p = 0; p < k; p ++ ) {          // Start 1-st loop
+          for ( i = 0; i < m; i ++ ) {      // Start 0-th loop
+              C[ j * ldc + i ] += A[ p * lda + i ] * B[ j * ldb + p ];
+          }                                 // End   0-th loop
+      }                                     // End   1-st loop
+  }                                         // End   2-st loop
+#endif
 }
 
 

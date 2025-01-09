@@ -46,31 +46,51 @@
 #include <bl_sgemm.h>
 
 void bl_sgemm_ref(
-        int    m,
-        int    n,
-        int    k,
-        float *XA,
-        int    lda,
-        float *XB,
-        int    ldb,
-        float *XC,
-        int    ldc
-        )
+    int    m,
+    int    n,
+    int    k,
+    float *XA,
+    int    lda,
+    float *XB,
+    int    ldb,
+    float *XC,
+    int    ldc
+    )
 {
     // Local variables.
-    int    i, j, p;
-    float alpha = 1.0, beta = 1.0;
+    int i, j, p;
 
     // Sanity check for early return.
-    if ( m == 0 || n == 0 || k == 0 ) return;
+    if (m == 0 || n == 0 || k == 0) {
+        printf( "bl_sgemm(): early return\n" );
+        return;
+    }
 
     // Reference GEMM implementation.
-    for ( i = 0; i < m; i ++ ) {
-        for ( j = 0; j < n; j ++ ) {
-            for ( p = 0; p < k; p ++ ) {
-                XC[ j * ldc + i ] += XA[ p * lda + i ] * XB[ j * ldb + p ];
+#ifdef ROW_MAJOR
+    assert(lda == k);
+    assert(ldb == n);
+    assert(ldc == n);
+    // ijp 顺序
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            for (p = 0; p < k; p++) {
+                XC[i * ldc + j] += XA[i * lda + p] * XB[p * ldb + j];
             }
         }
     }
+#else /* COLUMN_MAJOR */
+    assert(lda == m);
+    assert(ldb == k);
+    assert(ldc == m);
+    // ijp 顺序
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            for (p = 0; p < k; p++) {
+                XC[j * ldc + i] += XA[p * lda + i] * XB[j * ldb + p];
+            }
+        }
+    }
+#endif
 }
 
